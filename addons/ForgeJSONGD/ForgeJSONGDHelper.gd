@@ -1,11 +1,13 @@
+## JSON comparison and merge operations. Internal, use ForgeJSONGD instead.
 @abstract class_name ForgeJSONGDHelper extends ForgeJSONGDBase
 
 #region Comparison
 
 # Internal recursive function to perform the comparison.
 static func compare_recursive(a: Variant, b: Variant) -> Dictionary:
-	# If the types are different, they are not equal. Return the change.
-	if typeof(a) != typeof(b):
+	# Numbers (int/float) and text-like types (String/StringName/NodePath) are compared by value.
+	var comparable_scalars: bool = (_is_number(a) and _is_number(b)) or (_is_text(a) and _is_text(b))
+	if typeof(a) != typeof(b) and not comparable_scalars:
 		return {"old": a, "new": b}
 	# Handle comparison based on the type of the variables.
 	match typeof(a):
@@ -15,7 +17,7 @@ static func compare_recursive(a: Variant, b: Variant) -> Dictionary:
 			return _compare_arrays(a, b)
 		_:
 			# For all other primitive types (int, float, bool, string, null).
-			if a != b:
+			if not _scalars_equal(a, b):
 				return {"old": a, "new": b}
 			else:
 				# They are identical, so there is no difference.
@@ -49,12 +51,26 @@ static func _compare_dictionaries(a: Dictionary, b: Dictionary) -> Dictionary:
 
 # Compares two arrays.
 static func _compare_arrays(a: Array, b: Array) -> Dictionary:
-	# This correctly handles nested structures within the arrays.
-	if JSON.stringify(a) != JSON.stringify(b):
+	# Comparing the normalized data handles nested structures and int/float differences.
+	if _normalize_json(a) != _normalize_json(b):
 		return {"old": a, "new": b}
 	# The arrays are identical.
 	return {}
 	
+
+static func _is_number(value: Variant) -> bool:
+	return typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT
+
+
+static func _is_text(value: Variant) -> bool:
+	return typeof(value) in [TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH]
+
+
+static func _scalars_equal(a: Variant, b: Variant) -> bool:
+	if _is_text(a) and _is_text(b):
+		return str(a) == str(b)
+	return a == b
+
 #endregion
 
 #region Operation Helpers
